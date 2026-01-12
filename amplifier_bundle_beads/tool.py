@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from amplifier_core.types import Coordinator, ToolDefinition, ToolResult
+from amplifier_core import ModuleCoordinator, ToolResult, ToolSpec
 
 INSTALL_INSTRUCTIONS = """
 The 'bd' CLI (beads) is not installed or not in PATH.
@@ -53,7 +53,7 @@ Operations:
 - list: List all issues (optionally filtered)
 - sessions: Show sessions linked to an issue"""
 
-    def __init__(self, config: dict[str, Any], coordinator: Coordinator) -> None:
+    def __init__(self, config: dict[str, Any], coordinator: ModuleCoordinator) -> None:
         self.config = config
         self.coordinator = coordinator
         self._session_id: str | None = None
@@ -66,9 +66,9 @@ Operations:
             self._session_id = self.coordinator.config.get("session_id")
         return self._session_id
 
-    def get_definition(self) -> ToolDefinition:
+    def get_definition(self) -> ToolSpec:
         """Return the tool definition for LLM consumption."""
-        return ToolDefinition(
+        return ToolSpec(
             name=self.name,
             description=self.description,
             input_schema={
@@ -455,7 +455,7 @@ Operations:
             )
 
 
-async def mount(coordinator: Coordinator, config: dict[str, Any]) -> None:
+async def mount(coordinator: ModuleCoordinator, config: dict[str, Any]) -> None:
     """Mount the beads tool."""
     tool = BeadsTool(config, coordinator)
     coordinator.register_tool(tool.name, tool.get_definition(), tool.execute)

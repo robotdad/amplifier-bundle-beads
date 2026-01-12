@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from amplifier_core.types import Coordinator, HookResult
+from amplifier_core import HookResult, ModuleCoordinator
 
 
 def _bd_available() -> bool:
@@ -148,7 +148,7 @@ class BeadsHook:
 
     name = "beads"
 
-    def __init__(self, config: dict[str, Any], coordinator: Coordinator) -> None:
+    def __init__(self, config: dict[str, Any], coordinator: ModuleCoordinator) -> None:
         self.config = config
         self.coordinator = coordinator
         self.inject_ready = config.get("inject_ready", True)
@@ -163,7 +163,7 @@ class BeadsHook:
         return HookResult()
 
 
-async def mount(coordinator: Coordinator, config: dict[str, Any]) -> None:
+async def mount(coordinator: ModuleCoordinator, config: dict[str, Any]) -> None:
     """Mount the beads hook."""
     hook = BeadsHook(config, coordinator)
 
