@@ -1,0 +1,24 @@
+# Beads behavior - include this in your bundle for beads integration
+#
+# Usage in your bundle.md:
+#   includes:
+#     - bundle: git+https://github.com/microsoft/amplifier-foundation@main
+#     - bundle: git+https://github.com/microsoft/amplifier-bundle-beads@main#subdirectory=behaviors/beads.yaml
+
+tools:
+  - name: beads
+    module: git+https://github.com/microsoft/amplifier-bundle-beads@main
+    entry_point: amplifier_bundle_beads.tool:mount
+    config:
+      auto_session_tag: true
+
+hooks:
+  - name: beads-lifecycle
+    module: git+https://github.com/microsoft/amplifier-bundle-beads@main
+    entry_point: amplifier_bundle_beads.hooks:mount
+    config:
+      inject_ready: true
+
+context:
+  include:
+    - beads:context/beads-instructions.md
