@@ -11,14 +11,14 @@ includes:
 
 tools:
   - name: beads
-    module: git+https://github.com/microsoft/amplifier-bundle-beads@main
+    module: git+https://github.com/robotdad/amplifier-bundle-beads@main
     entry_point: amplifier_bundle_beads.tool:mount
     config:
       auto_session_tag: true
 
 hooks:
   - name: beads-lifecycle
-    module: git+https://github.com/microsoft/amplifier-bundle-beads@main
+    module: git+https://github.com/robotdad/amplifier-bundle-beads@main
     entry_point: amplifier_bundle_beads.hooks:mount
     config:
       inject_ready: true
