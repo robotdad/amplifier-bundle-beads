@@ -9,10 +9,15 @@ from typing import Any
 
 from amplifier_core import ModuleCoordinator, ToolResult
 
+INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh"
+
 INSTALL_INSTRUCTIONS = """
 The 'bd' CLI (beads) is not installed or not in PATH.
 
-Install via one of these methods:
+You can install it automatically:
+  beads(operation='setup', action='install')
+
+Or install manually via one of these methods:
 
   Homebrew (macOS/Linux):
     brew tap steveyegge/beads && brew install bd
@@ -43,6 +48,8 @@ Use beads to:
 - Claim tasks for the current session
 
 Operations:
+- setup: Install bd CLI and/or initialize beads in current directory
+- status: Check if bd is installed and beads is initialized
 - ready: List tasks ready to work on (no open blockers)
 - show: Show details of a specific issue
 - create: Create a new issue
@@ -60,6 +67,8 @@ Operations:
             "operation": {
                 "type": "string",
                 "enum": [
+                    "setup",
+                    "status",
                     "ready",
                     "show",
                     "create",
@@ -71,6 +80,11 @@ Operations:
                     "sessions",
                 ],
                 "description": "The beads operation to perform",
+            },
+            "action": {
+                "type": "string",
+                "enum": ["install", "init", "both"],
+                "description": "For setup operation: install (install bd CLI), init (initialize beads in current dir), both (install then init)",
             },
             "issue_id": {
                 "type": "string",
@@ -125,7 +139,20 @@ Operations:
 
     async def execute(self, params: dict[str, Any]) -> ToolResult:
         """Execute a beads operation."""
-        # Check if bd is available
+        operation = params.get("operation")
+        if not operation:
+            return ToolResult(
+                success=False,
+                output=json.dumps({"error": "missing_operation", "message": "Operation required"}),
+            )
+
+        # Setup and status work even without bd installed
+        if operation == "setup":
+            return await self._op_setup(params)
+        if operation == "status":
+            return await self._op_status(params)
+
+        # All other operations require bd to be installed
         if not self._bd_available():
             return ToolResult(
                 success=False,
@@ -135,13 +162,6 @@ Operations:
                         "message": INSTALL_INSTRUCTIONS,
                     }
                 ),
-            )
-
-        operation = params.get("operation")
-        if not operation:
-            return ToolResult(
-                success=False,
-                output=json.dumps({"error": "missing_operation", "message": "Operation required"}),
             )
 
         # Dispatch to operation handlers
@@ -171,6 +191,136 @@ Operations:
     def _bd_available(self) -> bool:
         """Check if bd CLI is available."""
         return shutil.which("bd") is not None
+
+    def _beads_initialized(self) -> bool:
+        """Check if beads is initialized in current directory."""
+        import os
+
+        return os.path.isdir(".beads")
+
+    async def _op_setup(self, params: dict[str, Any]) -> ToolResult:
+        """Install bd CLI and/or initialize beads in current directory.
+
+        Actions:
+        - install: Download and install the bd CLI
+        - init: Run 'bd init' in current directory
+        - both: Install then init (default if bd not installed)
+        """
+        action = params.get("action", "both" if not self._bd_available() else "init")
+
+        results: dict[str, Any] = {
+            "action": action,
+            "bd_installed_before": self._bd_available(),
+            "beads_initialized_before": self._beads_initialized() if self._bd_available() else None,
+        }
+
+        # Install bd if requested
+        if action in ("install", "both"):
+            if self._bd_available():
+                results["install"] = {"status": "skipped", "reason": "bd already installed"}
+            else:
+                install_result = self._install_bd()
+                results["install"] = install_result
+                if not install_result.get("success"):
+                    return ToolResult(
+                        success=False,
+                        output=json.dumps(results, indent=2),
+                    )
+
+        # Initialize beads if requested
+        if action in ("init", "both"):
+            if not self._bd_available():
+                results["init"] = {"status": "skipped", "reason": "bd not installed"}
+            elif self._beads_initialized():
+                results["init"] = {"status": "skipped", "reason": "beads already initialized"}
+            else:
+                success, output = self._run_bd(["init"], json_output=False)
+                results["init"] = {
+                    "status": "success" if success else "failed",
+                    "output": output,
+                }
+
+        results["bd_installed_after"] = self._bd_available()
+        results["beads_initialized_after"] = (
+            self._beads_initialized() if self._bd_available() else None
+        )
+
+        return ToolResult(success=True, output=json.dumps(results, indent=2))
+
+    def _install_bd(self) -> dict[str, Any]:
+        """Install bd CLI using the official install script."""
+        import os
+
+        try:
+            # Use the official install script (handles platform detection internally)
+            result = subprocess.run(
+                ["bash", "-c", f"curl -fsSL {INSTALL_SCRIPT_URL} | bash"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "HOME": os.path.expanduser("~")},
+            )
+
+            if result.returncode == 0:
+                # Refresh PATH to find newly installed bd
+                return {
+                    "success": True,
+                    "method": "install_script",
+                    "output": result.stdout[-500:] if len(result.stdout) > 500 else result.stdout,
+                    "hint": "You may need to restart your shell or run 'hash -r' to use bd",
+                }
+            else:
+                return {
+                    "success": False,
+                    "method": "install_script",
+                    "error": result.stderr or result.stdout,
+                    "hint": "Try manual installation - see INSTALL_INSTRUCTIONS",
+                }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": "Installation timed out after 120 seconds",
+                "hint": "Try manual installation",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "hint": "Try manual installation",
+            }
+
+    async def _op_status(self, params: dict[str, Any]) -> ToolResult:
+        """Check beads prerequisites and initialization status."""
+        status: dict[str, Any] = {
+            "bd_installed": self._bd_available(),
+            "bd_path": shutil.which("bd"),
+        }
+
+        if self._bd_available():
+            # Get bd version
+            success, output = self._run_bd(["version"], json_output=False)
+            status["bd_version"] = output.strip() if success else "unknown"
+
+            # Check if initialized
+            status["beads_initialized"] = self._beads_initialized()
+
+            if self._beads_initialized():
+                # Get issue count
+                success, output = self._run_bd(["list", "--status", "all"])
+                if success:
+                    try:
+                        issues = json.loads(output)
+                        if isinstance(issues, list):
+                            status["issue_count"] = len(issues)
+                        else:
+                            status["issue_count"] = len(issues.get("issues", []))
+                    except json.JSONDecodeError:
+                        status["issue_count"] = "unknown"
+        else:
+            status["setup_hint"] = "Run beads(operation='setup') to install bd CLI"
+
+        return ToolResult(success=True, output=json.dumps(status, indent=2))
 
     def _run_bd(self, args: list[str], json_output: bool = True) -> tuple[bool, str]:
         """Run a bd command and return (success, output)."""

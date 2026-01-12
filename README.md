@@ -25,7 +25,21 @@ This bundle integrates beads with Amplifier's session model:
 
 ## Prerequisites
 
-**You must install the `bd` CLI before using this bundle.**
+The `bd` CLI (beads) is required. You can install it automatically or manually:
+
+### Automatic Installation (Recommended)
+
+Let the agent install it for you:
+```
+beads(operation='setup', action='install')
+```
+
+Or install and initialize in one step:
+```
+beads(operation='setup', action='both')
+```
+
+### Manual Installation
 
 ```bash
 # Homebrew (macOS/Linux) - recommended
@@ -99,6 +113,8 @@ bd init
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
+| `setup` | Install bd CLI and/or initialize beads | `beads(operation='setup', action='both')` |
+| `status` | Check prerequisites and initialization | `beads(operation='status')` |
 | `ready` | List tasks with no blockers | `beads(operation='ready')` |
 | `show` | Show issue details | `beads(operation='show', issue_id='bd-a1b2')` |
 | `create` | Create new issue | `beads(operation='create', title='...')` |
@@ -108,6 +124,16 @@ bd init
 | `discover` | File discovered work | `beads(operation='discover', title='...', parent_id='bd-a1b2')` |
 | `list` | List all issues | `beads(operation='list', filter_status='open')` |
 | `sessions` | Get linked sessions | `beads(operation='sessions', issue_id='bd-a1b2')` |
+
+### Setup Actions
+
+The `setup` operation supports these actions:
+
+| Action | Description |
+|--------|-------------|
+| `install` | Download and install the bd CLI |
+| `init` | Run `bd init` in current directory |
+| `both` | Install bd then initialize (default if bd not installed) |
 
 ### Session Linking
 
