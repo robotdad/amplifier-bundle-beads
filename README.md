@@ -18,10 +18,10 @@ This bundle integrates beads with Amplifier's session model:
 | Component | Description |
 |-----------|-------------|
 | **beads tool** | CLI wrapper with all bd operations as tool actions |
-| **lifecycle hooks** | Auto-inject ready work on session start, update issues on session end |
 | **session linking** | Issues tagged with session IDs for follow-up questions |
-| **slash commands** | Shortcuts for common operations (when command bundling lands) |
-| **workflow skill** | Deep knowledge for complex multi-session work (when skill bundling lands) |
+| **lifecycle hooks** | Auto-inject ready work on session start *(planned - requires separate module)* |
+| **slash commands** | Shortcuts for common operations *(planned - when command bundling lands)* |
+| **workflow skill** | Deep knowledge for complex multi-session work *(planned - when skill bundling lands)* |
 
 ## Prerequisites
 
@@ -54,7 +54,7 @@ See [beads installation docs](https://github.com/steveyegge/beads/blob/main/docs
 
 ```bash
 # Add the bundle
-amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-beads@main
+amplifier bundle add git+https://github.com/robotdad/amplifier-bundle-beads@main
 
 # Use it
 amplifier bundle use beads
@@ -70,7 +70,7 @@ bundle:
 
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-  - bundle: git+https://github.com/microsoft/amplifier-bundle-beads@main
+  - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main
 ---
 
 # My Bundle
@@ -83,7 +83,7 @@ Your instructions here...
 ```yaml
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-  - bundle: git+https://github.com/microsoft/amplifier-bundle-beads@main#subdirectory=behaviors/beads.yaml
+  - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main#subdirectory=behaviors/beads.yaml
 ```
 
 ## Usage
@@ -127,9 +127,11 @@ Issues are automatically tagged with session IDs when you create, claim, close, 
 3. **Ask questions with full history**:
    The resumed session has complete context from when the work was done.
 
-### Automatic Context Injection
+### Automatic Context Injection (Planned)
 
-On session start, if there are ready tasks, they're automatically injected into the agent's context:
+> **Note**: This feature requires the hook module, which is planned for a future release.
+
+When hooks are enabled, on session start, ready tasks will be automatically injected into the agent's context:
 
 ```
 ## Ready Work (beads)
@@ -167,16 +169,16 @@ When skill bundling support lands, load the `beads-workflow` skill for deep know
 ```
 amplifier-bundle-beads/
 ├── bundle.md                    # Main bundle definition
-├── amplifier_bundle_beads/
+├── amplifier_module_tool_beads/
 │   ├── tool.py                  # beads tool (CLI wrapper)
-│   └── hooks.py                 # Session lifecycle hooks
+│   └── hooks.py                 # Session lifecycle hooks (planned)
 ├── behaviors/
 │   └── beads.yaml               # Includable behavior
 ├── context/
 │   └── beads-instructions.md    # Agent instructions
-├── commands/                    # Slash commands (for future bundling)
+├── commands/                    # Slash commands (planned)
 └── skills/
-    └── beads-workflow/          # Workflow skill (for future bundling)
+    └── beads-workflow/          # Workflow skill (planned)
 ```
 
 ## Development
@@ -206,9 +208,11 @@ The tool wraps the `bd` CLI, providing:
 - Graceful handling when bd is not installed (shows install instructions)
 - JSON parsing of bd output for structured responses
 
-### Hook Module
+### Hook Module (Planned)
 
-The hook subscribes to session lifecycle events:
+> **Note**: Hook support requires a separate `amplifier-module-hook-beads` package due to Amplifier's module loader architecture (one mount function per package).
+
+When available, the hook will subscribe to session lifecycle events:
 - **session:start**: Runs `bd ready` and injects results into context
 - **session:end**: Updates claimed issues with session-end marker
 
