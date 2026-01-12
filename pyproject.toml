@@ -1,5 +1,5 @@
 [project]
-name = "amplifier-bundle-beads"
+name = "amplifier-module-tool-beads"
 version = "0.1.0"
 description = "Beads integration for Amplifier - persistent, dependency-aware task tracking with session linking"
 readme = "README.md"
@@ -30,8 +30,8 @@ dev = [
 ]
 
 [project.entry-points."amplifier.modules"]
-tool-beads = "amplifier_bundle_beads.tool:mount"
-hook-beads = "amplifier_bundle_beads.hooks:mount"
+tool-beads = "amplifier_module_tool_beads.tool:mount"
+hook-beads = "amplifier_module_tool_beads.hooks:mount"
 
 [build-system]
 requires = ["hatchling"]
@@ -41,7 +41,7 @@ build-backend = "hatchling.build"
 package = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["amplifier_bundle_beads"]
+packages = ["amplifier_module_tool_beads"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -65,7 +65,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["amplifier_bundle_beads"]
+known-first-party = ["amplifier_module_tool_beads"]
 
 [tool.pyright]
 pythonVersion = "3.11"
