@@ -473,19 +473,19 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     # Mount hooks
     hooks_config = config.get("hooks", {})
 
-    # Ready hook - injects ready tasks on session start
+    # Ready hook - injects ready tasks on first LLM request
     ready_config = hooks_config.get("ready", {})
     if ready_config.get("enabled", True):
         from amplifier_module_tool_beads.hooks import BeadsReadyHook
 
         ready_hook = BeadsReadyHook(ready_config)
         coordinator.hooks.register(
-            event="session:start",
-            handler=ready_hook.on_session_start,
+            event="provider:request",
+            handler=ready_hook.on_provider_request,
             priority=ready_hook.priority,
             name="beads-ready",
         )
-        logger.info("Registered beads-ready hook on session:start")
+        logger.info("Registered beads-ready hook on provider:request")
 
     # Session end hook - updates claimed issues when session ends
     session_end_config = hooks_config.get("session_end", {})

@@ -42,10 +42,13 @@ def _run_bd(args: list[str], json_output: bool = True) -> tuple[bool, str]:
 
 
 class BeadsReadyHook:
-    """Hook that injects ready beads tasks into context on session start.
+    """Hook that injects ready beads tasks into context on first LLM request.
 
     This gives agents immediate visibility into available work without
     requiring them to explicitly call the beads tool first.
+
+    Uses provider:request event (same pattern as skills-visibility hook)
+    since this is the proven approach for context injection in Amplifier.
     """
 
     def __init__(self, config: dict[str, Any]):
@@ -55,28 +58,33 @@ class BeadsReadyHook:
             config: Hook configuration with options:
                 - enabled: Whether to inject ready tasks (default: True)
                 - max_issues: Maximum issues to show (default: 10)
-                - priority: Hook priority (default: 50)
+                - priority: Hook priority (default: 20, runs early)
         """
         self.enabled = config.get("enabled", True)
         self.max_issues = config.get("max_issues", 10)
-        self.priority = config.get("priority", 50)
+        self.priority = config.get("priority", 20)
+        self._injected = False  # Only inject once per session
 
         logger.debug(
             f"Initialized BeadsReadyHook: enabled={self.enabled}, max_issues={self.max_issues}"
         )
 
-    async def on_session_start(self, event: str, data: dict[str, Any]) -> HookResult:
-        """Inject ready tasks into context on session start.
+    async def on_provider_request(self, event: str, data: dict[str, Any]) -> HookResult:
+        """Inject ready tasks into context before first LLM request.
 
-        Event: session:start
+        Event: provider:request (before each LLM call)
 
         Args:
-            event: Event name (should be "session:start")
+            event: Event name (should be "provider:request")
             data: Event data dictionary
 
         Returns:
             HookResult with context_injection if there are ready tasks
+            and this is the first request of the session
         """
+        # Only inject once per session
+        if self._injected:
+            return HookResult(action="continue")
         if not self.enabled:
             return HookResult(action="continue")
 
@@ -94,7 +102,14 @@ class BeadsReadyHook:
 
         try:
             ready_data = json.loads(output)
-            issues = ready_data.get("issues", [])
+
+            # bd ready --json returns a list directly, not a dict
+            if isinstance(ready_data, list):
+                issues = ready_data
+            else:
+                issues = ready_data.get("issues", [])
+
+            self._injected = True  # Mark as done regardless of result
 
             if not issues:
                 # No ready work - don't inject anything
@@ -111,6 +126,7 @@ class BeadsReadyHook:
 
         except json.JSONDecodeError:
             logger.debug("Failed to parse bd ready output as JSON")
+            self._injected = True
             return HookResult(action="continue")
 
     def _format_ready_work(self, issues: list[dict[str, Any]]) -> str:
@@ -198,7 +214,12 @@ class BeadsSessionEndHook:
 
         try:
             list_data = json.loads(output)
-            issues = list_data.get("issues", [])
+            
+            # bd list --json returns a list directly, not a dict
+            if isinstance(list_data, list):
+                issues = list_data
+            else:
+                issues = list_data.get("issues", [])
 
             # Look for issues with this session's claim tag
             session_tag = f"[amplifier:claimed-by-session:{session_id}]"
