@@ -19,7 +19,7 @@ This bundle integrates beads with Amplifier's session model:
 |-----------|-------------|
 | **beads tool** | CLI wrapper with all bd operations as tool actions |
 | **session linking** | Issues tagged with session IDs for follow-up questions |
-| **lifecycle hooks** | Auto-inject ready work on session start *(planned - requires separate module)* |
+| **lifecycle hooks** | Auto-inject ready work on session start, update issues on session end |
 | **slash commands** | Shortcuts for common operations *(planned - when command bundling lands)* |
 | **workflow skill** | Deep knowledge for complex multi-session work *(planned - when skill bundling lands)* |
 
@@ -127,11 +127,9 @@ Issues are automatically tagged with session IDs when you create, claim, close, 
 3. **Ask questions with full history**:
    The resumed session has complete context from when the work was done.
 
-### Automatic Context Injection (Planned)
+### Automatic Context Injection
 
-> **Note**: This feature requires the hook module, which is planned for a future release.
-
-When hooks are enabled, on session start, ready tasks will be automatically injected into the agent's context:
+On session start, if there are ready tasks, they're automatically injected into the agent's context:
 
 ```
 ## Ready Work (beads)
@@ -170,8 +168,8 @@ When skill bundling support lands, load the `beads-workflow` skill for deep know
 amplifier-bundle-beads/
 ├── bundle.md                    # Main bundle definition
 ├── amplifier_module_tool_beads/
-│   ├── tool.py                  # beads tool (CLI wrapper)
-│   └── hooks.py                 # Session lifecycle hooks (planned)
+│   ├── tool.py                  # beads tool (CLI wrapper + hook registration)
+│   └── hooks.py                 # Session lifecycle hooks
 ├── behaviors/
 │   └── beads.yaml               # Includable behavior
 ├── context/
@@ -208,13 +206,25 @@ The tool wraps the `bd` CLI, providing:
 - Graceful handling when bd is not installed (shows install instructions)
 - JSON parsing of bd output for structured responses
 
-### Hook Module (Planned)
+### Hook Module
 
-> **Note**: Hook support requires a separate `amplifier-module-hook-beads` package due to Amplifier's module loader architecture (one mount function per package).
+Hooks are registered when the tool mounts, subscribing to session lifecycle events:
+- **session:start** (`beads-ready` hook): Runs `bd ready` and injects results into context
+- **session:end** (`beads-session-end` hook): Updates claimed issues with session-end marker
 
-When available, the hook will subscribe to session lifecycle events:
-- **session:start**: Runs `bd ready` and injects results into context
-- **session:end**: Updates claimed issues with session-end marker
+Configure hooks via bundle config:
+```yaml
+tools:
+  - module: tool-beads
+    source: git+https://github.com/robotdad/amplifier-bundle-beads@main
+    config:
+      hooks:
+        ready:
+          enabled: true      # Inject ready tasks on session start
+          max_issues: 10     # Max issues to show
+        session_end:
+          enabled: true      # Update issues on session end
+```
 
 ### Session Linking
 

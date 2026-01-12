@@ -451,7 +451,54 @@ Operations:
 
 
 async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = None) -> BeadsTool:
-    """Mount the beads tool."""
-    tool = BeadsTool(config or {}, coordinator)
+    """Mount the beads tool and lifecycle hooks.
+
+    Args:
+        coordinator: Module coordinator
+        config: Tool configuration with options:
+            - hooks.ready.enabled: Inject ready tasks on session start (default: True)
+            - hooks.ready.max_issues: Max issues to show (default: 10)
+            - hooks.session_end.enabled: Update issues on session end (default: True)
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    config = config or {}
+
+    # Mount the tool
+    tool = BeadsTool(config, coordinator)
     await coordinator.mount("tools", tool)
+    logger.info("Mounted beads tool")
+
+    # Mount hooks
+    hooks_config = config.get("hooks", {})
+
+    # Ready hook - injects ready tasks on session start
+    ready_config = hooks_config.get("ready", {})
+    if ready_config.get("enabled", True):
+        from amplifier_module_tool_beads.hooks import BeadsReadyHook
+
+        ready_hook = BeadsReadyHook(ready_config)
+        coordinator.hooks.register(
+            event="session:start",
+            handler=ready_hook.on_session_start,
+            priority=ready_hook.priority,
+            name="beads-ready",
+        )
+        logger.info("Registered beads-ready hook on session:start")
+
+    # Session end hook - updates claimed issues when session ends
+    session_end_config = hooks_config.get("session_end", {})
+    if session_end_config.get("enabled", True):
+        from amplifier_module_tool_beads.hooks import BeadsSessionEndHook
+
+        session_end_hook = BeadsSessionEndHook(session_end_config)
+        coordinator.hooks.register(
+            event="session:end",
+            handler=session_end_hook.on_session_end,
+            priority=session_end_hook.priority,
+            name="beads-session-end",
+        )
+        logger.info("Registered beads-session-end hook on session:end")
+
     return tool

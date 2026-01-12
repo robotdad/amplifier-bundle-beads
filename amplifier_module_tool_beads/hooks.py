@@ -1,13 +1,16 @@
-"""Beads hook module - session lifecycle integration."""
+"""Beads hooks - session lifecycle integration for ready work injection."""
 
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import subprocess
 from typing import Any
 
-from amplifier_core import HookResult, ModuleCoordinator
+from amplifier_core import HookResult
+
+logger = logging.getLogger(__name__)
 
 
 def _bd_available() -> bool:
@@ -38,135 +41,185 @@ def _run_bd(args: list[str], json_output: bool = True) -> tuple[bool, str]:
         return False, str(e)
 
 
-def _format_ready_work(data: dict[str, Any]) -> str:
-    """Format ready work for context injection."""
-    issues = data.get("issues", [])
-    if not issues:
-        return ""
+class BeadsReadyHook:
+    """Hook that injects ready beads tasks into context on session start.
 
-    lines = ["## Ready Work (beads)", ""]
-    lines.append("Tasks with no open blockers, ready to work on:")
-    lines.append("")
-
-    for issue in issues[:10]:  # Limit to 10 to save context
-        issue_id = issue.get("id", "?")
-        title = issue.get("title", "Untitled")
-        priority = issue.get("priority", "")
-        priority_str = f" [{priority}]" if priority else ""
-        lines.append(f"- **{issue_id}**: {title}{priority_str}")
-
-    if len(issues) > 10:
-        lines.append(f"- ... and {len(issues) - 10} more")
-
-    lines.append("")
-    lines.append("Use `beads(operation='claim', issue_id='...')` to claim a task.")
-    lines.append("")
-
-    return "\n".join(lines)
-
-
-async def on_session_start(event: str, data: dict[str, Any]) -> HookResult:
-    """Inject bd ready output into agent context on session start.
-
-    This gives the agent immediate visibility into what work is available.
+    This gives agents immediate visibility into available work without
+    requiring them to explicitly call the beads tool first.
     """
-    if not _bd_available():
-        # Silently skip if bd not installed - tool will show install instructions when used
-        return HookResult()
 
-    # Check if beads is initialized in this directory
-    success, output = _run_bd(["ready"])
-    if not success:
-        # Not initialized or other error - skip silently
-        return HookResult()
+    def __init__(self, config: dict[str, Any]):
+        """Initialize hook with configuration.
 
-    try:
-        ready_data = json.loads(output)
-        issues = ready_data.get("issues", [])
+        Args:
+            config: Hook configuration with options:
+                - enabled: Whether to inject ready tasks (default: True)
+                - max_issues: Maximum issues to show (default: 10)
+                - priority: Hook priority (default: 50)
+        """
+        self.enabled = config.get("enabled", True)
+        self.max_issues = config.get("max_issues", 10)
+        self.priority = config.get("priority", 50)
 
-        if not issues:
-            # No ready work - don't inject anything
-            return HookResult()
+        logger.debug(
+            f"Initialized BeadsReadyHook: enabled={self.enabled}, max_issues={self.max_issues}"
+        )
 
-        context = _format_ready_work(ready_data)
-        return HookResult(context_injection=context)
+    async def on_session_start(self, event: str, data: dict[str, Any]) -> HookResult:
+        """Inject ready tasks into context on session start.
 
-    except json.JSONDecodeError:
-        return HookResult()
+        Event: session:start
 
+        Args:
+            event: Event name (should be "session:start")
+            data: Event data dictionary
 
-async def on_session_end(event: str, data: dict[str, Any]) -> HookResult:
-    """Update claimed issues when session ends.
+        Returns:
+            HookResult with context_injection if there are ready tasks
+        """
+        if not self.enabled:
+            return HookResult(action="continue")
 
-    This provides continuity by recording what happened in this session.
-    """
-    if not _bd_available():
-        return HookResult()
+        if not _bd_available():
+            # Silently skip if bd not installed
+            logger.debug("bd CLI not available, skipping ready injection")
+            return HookResult(action="continue")
 
-    session_id = data.get("session_id")
-    if not session_id:
-        return HookResult()
+        # Check for ready tasks
+        success, output = _run_bd(["ready"])
+        if not success:
+            # Not initialized or error - skip silently
+            logger.debug(f"bd ready failed: {output}")
+            return HookResult(action="continue")
 
-    # Find issues that were claimed by this session
-    success, output = _run_bd(["list", "--status", "in_progress"])
-    if not success:
-        return HookResult()
+        try:
+            ready_data = json.loads(output)
+            issues = ready_data.get("issues", [])
 
-    try:
-        list_data = json.loads(output)
-        issues = list_data.get("issues", [])
+            if not issues:
+                # No ready work - don't inject anything
+                return HookResult(action="continue")
 
-        # Look for issues with this session's claim tag
-        session_tag = f"[amplifier:claimed-by-session:{session_id}]"
-        claimed_issues = []
-
-        for issue in issues:
-            notes = issue.get("notes", "")
-            if session_tag in notes:
-                claimed_issues.append(issue.get("id"))
-
-        # Add session-end note to claimed issues
-        for issue_id in claimed_issues:
-            _run_bd(
-                [
-                    "update",
-                    issue_id,
-                    "--notes",
-                    f"[amplifier:session-ended:{session_id}]",
-                ],
-                json_output=False,
+            context = self._format_ready_work(issues)
+            return HookResult(
+                action="inject_context",
+                context_injection=context,
+                context_injection_role="user",
+                ephemeral=True,
+                suppress_output=True,
             )
 
-    except json.JSONDecodeError:
-        pass
+        except json.JSONDecodeError:
+            logger.debug("Failed to parse bd ready output as JSON")
+            return HookResult(action="continue")
 
-    return HookResult()
+    def _format_ready_work(self, issues: list[dict[str, Any]]) -> str:
+        """Format ready work for context injection.
+
+        Args:
+            issues: List of ready issues from bd ready
+
+        Returns:
+            Formatted markdown string wrapped in system-reminder tags
+        """
+        lines = ["Ready work from beads (tasks with no open blockers):", ""]
+
+        for issue in issues[: self.max_issues]:
+            issue_id = issue.get("id", "?")
+            title = issue.get("title", "Untitled")
+            priority = issue.get("priority", "")
+            priority_str = f" [{priority}]" if priority else ""
+            lines.append(f"- **{issue_id}**: {title}{priority_str}")
+
+        if len(issues) > self.max_issues:
+            lines.append(f"- ... and {len(issues) - self.max_issues} more")
+
+        lines.append("")
+        lines.append("Use `beads(operation='claim', issue_id='...')` to claim a task.")
+
+        content = "\n".join(lines)
+
+        # Add behavioral note
+        behavioral_note = (
+            "\n\nThis context is for your reference. Consider these tasks when "
+            "the user's request aligns with available work."
+        )
+
+        # Wrap in system-reminder tag with source attribution
+        return f'<system-reminder source="hooks-beads-ready">\n{content}{behavioral_note}\n</system-reminder>'
 
 
-class BeadsHook:
-    """Beads lifecycle hook for session start/end events."""
+class BeadsSessionEndHook:
+    """Hook that updates claimed issues when session ends.
 
-    name = "beads"
+    This provides continuity by recording session end markers on issues
+    that were claimed during the session.
+    """
 
-    def __init__(self, config: dict[str, Any], coordinator: ModuleCoordinator) -> None:
-        self.config = config
-        self.coordinator = coordinator
-        self.inject_ready = config.get("inject_ready", True)
+    def __init__(self, config: dict[str, Any]):
+        """Initialize hook with configuration.
 
-    async def __call__(self, event: str, data: dict[str, Any]) -> HookResult:
-        """Handle lifecycle events."""
-        if event == "session:start" and self.inject_ready:
-            return await on_session_start(event, data)
-        elif event == "session:end":
-            return await on_session_end(event, data)
+        Args:
+            config: Hook configuration with options:
+                - enabled: Whether to update issues on session end (default: True)
+                - priority: Hook priority (default: 90, runs late)
+        """
+        self.enabled = config.get("enabled", True)
+        self.priority = config.get("priority", 90)
 
-        return HookResult()
+        logger.debug(f"Initialized BeadsSessionEndHook: enabled={self.enabled}")
 
+    async def on_session_end(self, event: str, data: dict[str, Any]) -> HookResult:
+        """Update claimed issues when session ends.
 
-async def mount(coordinator: ModuleCoordinator, config: dict[str, Any]) -> None:
-    """Mount the beads hook."""
-    hook = BeadsHook(config, coordinator)
+        Event: session:end
 
-    # Subscribe to session lifecycle events
-    coordinator.subscribe("session:start", hook)
-    coordinator.subscribe("session:end", hook)
+        Args:
+            event: Event name (should be "session:end")
+            data: Event data with session_id
+
+        Returns:
+            HookResult (always continue, this is observational)
+        """
+        if not self.enabled:
+            return HookResult(action="continue")
+
+        if not _bd_available():
+            return HookResult(action="continue")
+
+        session_id = data.get("session_id")
+        if not session_id:
+            return HookResult(action="continue")
+
+        # Find issues claimed by this session
+        success, output = _run_bd(["list", "--status", "in_progress"])
+        if not success:
+            return HookResult(action="continue")
+
+        try:
+            list_data = json.loads(output)
+            issues = list_data.get("issues", [])
+
+            # Look for issues with this session's claim tag
+            session_tag = f"[amplifier:claimed-by-session:{session_id}]"
+
+            for issue in issues:
+                notes = issue.get("notes", "")
+                if session_tag in notes:
+                    issue_id = issue.get("id")
+                    if issue_id:
+                        _run_bd(
+                            [
+                                "update",
+                                issue_id,
+                                "--notes",
+                                f"[amplifier:session-ended:{session_id}]",
+                            ],
+                            json_output=False,
+                        )
+                        logger.debug(f"Marked session end on issue {issue_id}")
+
+        except json.JSONDecodeError:
+            pass
+
+        return HookResult(action="continue")
