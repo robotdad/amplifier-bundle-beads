@@ -455,7 +455,8 @@ Operations:
             )
 
 
-async def mount(coordinator: ModuleCoordinator, config: dict[str, Any]) -> None:
+async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = None) -> BeadsTool:
     """Mount the beads tool."""
-    tool = BeadsTool(config, coordinator)
-    coordinator.register_tool(tool.name, tool.get_definition(), tool.execute)
+    tool = BeadsTool(config or {}, coordinator)
+    await coordinator.mount("tools", tool)
+    return tool
