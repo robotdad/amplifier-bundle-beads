@@ -13,11 +13,8 @@ tools:
   - module: tool-beads
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
 
-hooks:
-  - module: hook-beads
-    source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-    config:
-      inject_ready: true
+# Note: Hook support requires separate module package (amplifier-module-hook-beads)
+# For now, the tool provides core beads functionality
 ---
 
 # Beads Integration
