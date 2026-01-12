@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from amplifier_core import ModuleCoordinator, ToolResult, ToolSpec
+from amplifier_core import ModuleCoordinator, ToolResult
 
 INSTALL_INSTRUCTIONS = """
 The 'bd' CLI (beads) is not installed or not in PATH.
@@ -53,6 +53,63 @@ Operations:
 - list: List all issues (optionally filtered)
 - sessions: Show sessions linked to an issue"""
 
+    # Tool input schema - required by Amplifier Tool protocol
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": [
+                    "ready",
+                    "show",
+                    "create",
+                    "update",
+                    "close",
+                    "claim",
+                    "discover",
+                    "list",
+                    "sessions",
+                ],
+                "description": "The beads operation to perform",
+            },
+            "issue_id": {
+                "type": "string",
+                "description": "Issue ID (e.g., 'bd-a1b2') - required for show, update, close, claim, sessions",
+            },
+            "title": {
+                "type": "string",
+                "description": "Issue title - required for create, optional for update",
+            },
+            "status": {
+                "type": "string",
+                "enum": ["open", "in_progress", "blocked", "closed"],
+                "description": "Issue status - for update operation",
+            },
+            "notes": {
+                "type": "string",
+                "description": "Notes to add to the issue",
+            },
+            "parent_id": {
+                "type": "string",
+                "description": "Parent issue ID - for discover operation (creates discovered-from link)",
+            },
+            "blocks": {
+                "type": "string",
+                "description": "Comma-separated issue IDs that this issue blocks",
+            },
+            "blocked_by": {
+                "type": "string",
+                "description": "Comma-separated issue IDs that block this issue",
+            },
+            "filter_status": {
+                "type": "string",
+                "enum": ["open", "in_progress", "blocked", "closed", "all"],
+                "description": "Filter for list operation (default: open)",
+            },
+        },
+        "required": ["operation"],
+    }
+
     def __init__(self, config: dict[str, Any], coordinator: ModuleCoordinator) -> None:
         self.config = config
         self.coordinator = coordinator
@@ -65,68 +122,6 @@ Operations:
             # Try to get from coordinator context
             self._session_id = self.coordinator.config.get("session_id")
         return self._session_id
-
-    def get_definition(self) -> ToolSpec:
-        """Return the tool definition for LLM consumption."""
-        return ToolSpec(
-            name=self.name,
-            description=self.description,
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "operation": {
-                        "type": "string",
-                        "enum": [
-                            "ready",
-                            "show",
-                            "create",
-                            "update",
-                            "close",
-                            "claim",
-                            "discover",
-                            "list",
-                            "sessions",
-                        ],
-                        "description": "The beads operation to perform",
-                    },
-                    "issue_id": {
-                        "type": "string",
-                        "description": "Issue ID (e.g., 'bd-a1b2') - required for show, update, close, claim, sessions",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "Issue title - required for create, optional for update",
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": ["open", "in_progress", "blocked", "closed"],
-                        "description": "Issue status - for update operation",
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "Notes to add to the issue",
-                    },
-                    "parent_id": {
-                        "type": "string",
-                        "description": "Parent issue ID - for discover operation (creates discovered-from link)",
-                    },
-                    "blocks": {
-                        "type": "string",
-                        "description": "Comma-separated issue IDs that this issue blocks",
-                    },
-                    "blocked_by": {
-                        "type": "string",
-                        "description": "Comma-separated issue IDs that block this issue",
-                    },
-                    "filter_status": {
-                        "type": "string",
-                        "enum": ["open", "in_progress", "blocked", "closed", "all"],
-                        "description": "Filter for list operation (default: open)",
-                    },
-                },
-                "required": ["operation"],
-            },
-        )
 
     async def execute(self, params: dict[str, Any]) -> ToolResult:
         """Execute a beads operation."""
