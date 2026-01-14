@@ -100,14 +100,43 @@ includes:
   - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main#subdirectory=behaviors/beads.yaml
 ```
 
-## Usage
+## Configuration
 
-### Initialize Beads in Your Project
+### Centralized Tracking (Recommended)
+
+Use a single beads database across all your projects:
+
+```yaml
+tools:
+  - module: tool-beads
+    source: git+https://github.com/robotdad/amplifier-bundle-beads@main
+    config:
+      beads_dir: ~/my-beads/.beads  # All projects share this database
+      hooks:
+        ready:
+          enabled: true
+        session_end:
+          enabled: true
+```
+
+This approach:
+- Keeps all your work in one place
+- Works across multiple projects without per-repo setup
+- Can be backed by a private git repo for sync/backup
+- Lets the agent track cross-project work
+
+### Per-Project Tracking
+
+For project-specific issue tracking (traditional mode):
 
 ```bash
 cd your-project
 bd init
 ```
+
+Issues are stored in `.beads/` within that project and committed with the code.
+
+## Usage
 
 ### Tool Operations
 
@@ -238,12 +267,14 @@ Hooks are registered when the tool mounts, subscribing to session lifecycle even
 - **session:start** (`beads-ready` hook): Runs `bd ready` and injects results into context
 - **session:end** (`beads-session-end` hook): Updates claimed issues with session-end marker
 
-Configure hooks via bundle config:
+Configure via bundle config:
 ```yaml
 tools:
   - module: tool-beads
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
     config:
+      # Optional: centralized beads directory (omit for per-project .beads/)
+      beads_dir: ~/my-beads/.beads
       hooks:
         ready:
           enabled: true      # Inject ready tasks on session start
