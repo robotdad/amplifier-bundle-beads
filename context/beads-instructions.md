@@ -226,6 +226,35 @@ beads(operation='close', issue_id='work-xyz', notes='Summary of what was done')
 - **Update notes with "complete" without actually closing the issue**
 - **End a session with identified follow-up work without filing it**
 
+## Project AGENTS.md Content
+
+When using beads in a project, the project's AGENTS.md should include beads-specific context. This bundle provides generic beads guidance; project AGENTS.md provides the specifics.
+
+**Recommended AGENTS.md sections for beads projects:**
+
+```markdown
+## Beads Configuration
+
+- **Tracking mode**: Centralized at `~/Work/.beads` (shared across projects)
+- **Key issues**: bd-xxx (feature work), bd-yyy (tech debt)
+
+## Repository Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| `repo-a/` | Core library |
+| `repo-b/` | CLI tool |
+
+## Project-Specific Completion Checklist
+
+Before ending a session:
+- [ ] Run tests: `cd repo-a && make test`
+- [ ] Push all repos
+- [ ] Sync beads: `bd sync && git push` (if centralized)
+```
+
+**Why this matters**: The bundle instructions tell agents *how* to use beads. The project AGENTS.md tells them *what* to track and *where* things are. Without project context, agents don't know which repos exist, which issues are relevant, or project-specific quality gates.
+
 ## Quick Reference
 
 | Operation | Required Params | Optional Params |
