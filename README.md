@@ -64,6 +64,17 @@ See [beads installation docs](https://github.com/steveyegge/beads/blob/main/docs
 
 ## Installation
 
+### Quick Start
+
+Copy the [example workspace bundle](examples/workspace-bundle.md) to `.amplifier/bundle.md` in your workspace:
+
+```bash
+mkdir -p .amplifier
+curl -o .amplifier/bundle.md https://raw.githubusercontent.com/robotdad/amplifier-bundle-beads/main/examples/workspace-bundle.md
+```
+
+Then start Amplifier in that directory.
+
 ### Use the Bundle Directly
 
 ```bash
