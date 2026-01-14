@@ -111,16 +111,35 @@ User: "What was the decision on work-a1b2?"
 3. The resumed session has full context from when the work was done
 ```
 
-## Landing the Plane
+## Landing the Plane (MANDATORY)
 
-Before ending a session with open beads work:
+Before ending ANY session where you worked on tracked issues, complete this checklist:
 
-1. **Update status** on any claimed issues
-2. **Add notes** about current state and next steps
-3. **File discovered work** with proper links
-4. **Don't leave claimed issues** without status update
+### Step 1: File ALL Discovered Work
 
-This ensures the next session (or agent) can pick up seamlessly.
+Review what you did. For each of these, file a discovered issue:
+- [ ] Follow-up tasks mentioned but not done
+- [ ] "We should also..." items
+- [ ] Edge cases deferred
+- [ ] Integration/testing work identified
+- [ ] Documentation needs
+- [ ] Refactoring opportunities noted
+
+**If you identified work and didn't file it, the whole point of beads is lost.**
+
+### Step 2: Update or Close Issues
+
+For each issue you worked on:
+- [ ] **Complete?** → `close` with summary of what was done
+- [ ] **Incomplete?** → `update` with notes on current state and what remains
+
+### Step 3: Verify
+
+Ask yourself:
+- "If a different agent picks this up tomorrow, do they have everything they need?"
+- "Is there any work I identified that isn't tracked anywhere?"
+
+If the answer to either is "no" → go back and fix it.
 
 ## Privacy Considerations
 
@@ -155,23 +174,57 @@ The agent should remind users to sync periodically if using centralized tracking
 
 ## Agent Behavior Guidelines
 
+### CRITICAL: Filing Discovered Work
+
+**This is the primary value of beads.** When you identify work that should be done but won't be done in this session, you MUST file it as a discovered issue. Examples:
+
+| While Working On | You Notice | Action |
+|------------------|------------|--------|
+| Implementing feature | Edge case needs handling later | `discover` with parent link |
+| Building a bundle | Integration testing needed | `discover` with parent link |
+| Fixing a bug | Related code needs refactoring | `discover` with parent link |
+| Any implementation | Follow-up work (docs, tests, polish) | `discover` with parent link |
+
+**The pattern**: If you think "we should also..." or "later we'll need to..." → FILE IT NOW.
+
+```
+beads(operation='discover', title='Integration testing with amplifier CLI', parent_id='work-xyz', 
+      notes='Bundle built but not wired into CLI yet')
+```
+
+Discovered issues create a trail. Without them, follow-up work gets lost between sessions.
+
+### CRITICAL: Closing Issues
+
+An issue with notes saying "implementation complete" is NOT closed. You must explicitly close it:
+
+```
+beads(operation='close', issue_id='work-xyz', notes='Summary of what was done')
+```
+
+**Before ending a session**, if you worked on a tracked issue:
+1. Is the work actually complete? → Close it
+2. Is there follow-up work? → File discovered issues first, then close
+3. Is work incomplete? → Update notes with current state, leave open
+
 ### Do Automatically
 - Check `ready` work at session start (hooks handle this)
 - Create issues when multi-session work is identified
 - Claim issues before starting work on them
-- Close issues when work completes
-- File discovered work with proper parent links
-- Add notes before session ends
+- **File discovered work immediately when identified** (don't wait until session end)
+- **Close issues when their specific scope is complete**
+- Add notes before session ends if work is incomplete
 
 ### Ask User First
 - Before creating issues for work the user described (confirm scope)
-- Before closing issues (confirm work is actually complete)
 - When choosing between multiple ready issues (let user prioritize)
 
 ### Never
 - Create beads issues for simple single-turn tasks
 - Leave claimed issues without updating at session end
 - Assume issue priority without user input
+- **Update notes with "complete" without actually closing the issue**
+- **End a session with identified follow-up work without filing it**
 
 ## Quick Reference
 
