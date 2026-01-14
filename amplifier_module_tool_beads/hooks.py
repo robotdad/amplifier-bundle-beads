@@ -18,11 +18,20 @@ def _bd_available() -> bool:
     return shutil.which("bd") is not None
 
 
-def _run_bd(args: list[str], json_output: bool = True) -> tuple[bool, str]:
+def _run_bd(
+    args: list[str], json_output: bool = True, beads_dir: str | None = None
+) -> tuple[bool, str]:
     """Run a bd command and return (success, output)."""
+    import os
+
     cmd = ["bd"] + args
     if json_output:
         cmd.append("--json")
+
+    # Build environment with optional BEADS_DIR for centralized tracking
+    env = os.environ.copy()
+    if beads_dir:
+        env["BEADS_DIR"] = os.path.expanduser(beads_dir)
 
     try:
         result = subprocess.run(
@@ -30,6 +39,7 @@ def _run_bd(args: list[str], json_output: bool = True) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=10,
+            env=env,
         )
         if result.returncode == 0:
             return True, result.stdout.strip()
@@ -51,7 +61,7 @@ class BeadsReadyHook:
     since this is the proven approach for context injection in Amplifier.
     """
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any], beads_dir: str | None = None):
         """Initialize hook with configuration.
 
         Args:
@@ -59,10 +69,12 @@ class BeadsReadyHook:
                 - enabled: Whether to inject ready tasks (default: True)
                 - max_issues: Maximum issues to show (default: 10)
                 - priority: Hook priority (default: 20, runs early)
+            beads_dir: Optional path to centralized beads directory
         """
         self.enabled = config.get("enabled", True)
         self.max_issues = config.get("max_issues", 10)
         self.priority = config.get("priority", 20)
+        self._beads_dir = beads_dir
         self._injected = False  # Only inject once per session
 
         logger.debug(
@@ -94,7 +106,7 @@ class BeadsReadyHook:
             return HookResult(action="continue")
 
         # Check for ready tasks
-        success, output = _run_bd(["ready"])
+        success, output = _run_bd(["ready"], beads_dir=self._beads_dir)
         if not success:
             # Not initialized or error - skip silently
             logger.debug(f"bd ready failed: {output}")
@@ -172,16 +184,18 @@ class BeadsSessionEndHook:
     that were claimed during the session.
     """
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any], beads_dir: str | None = None):
         """Initialize hook with configuration.
 
         Args:
             config: Hook configuration with options:
                 - enabled: Whether to update issues on session end (default: True)
                 - priority: Hook priority (default: 90, runs late)
+            beads_dir: Optional path to centralized beads directory
         """
         self.enabled = config.get("enabled", True)
         self.priority = config.get("priority", 90)
+        self._beads_dir = beads_dir
 
         logger.debug(f"Initialized BeadsSessionEndHook: enabled={self.enabled}")
 
@@ -208,13 +222,15 @@ class BeadsSessionEndHook:
             return HookResult(action="continue")
 
         # Find issues claimed by this session
-        success, output = _run_bd(["list", "--status", "in_progress"])
+        success, output = _run_bd(
+            ["list", "--status", "in_progress"], beads_dir=self._beads_dir
+        )
         if not success:
             return HookResult(action="continue")
 
         try:
             list_data = json.loads(output)
-            
+
             # bd list --json returns a list directly, not a dict
             if isinstance(list_data, list):
                 issues = list_data
@@ -237,6 +253,7 @@ class BeadsSessionEndHook:
                                 f"[amplifier:session-ended:{session_id}]",
                             ],
                             json_output=False,
+                            beads_dir=self._beads_dir,
                         )
                         logger.debug(f"Marked session end on issue {issue_id}")
 

@@ -13,6 +13,8 @@ tools:
   - module: tool-beads
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
     config:
+      # Centralized beads directory - all projects share this database
+      beads_dir: ~/Work/.beads
       hooks:
         ready:
           enabled: true

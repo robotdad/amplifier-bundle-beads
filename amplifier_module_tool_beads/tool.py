@@ -128,6 +128,8 @@ Operations:
         self.config = config
         self.coordinator = coordinator
         self._session_id: str | None = None
+        # Support configurable beads directory for centralized tracking
+        self._beads_dir: str | None = config.get("beads_dir")
 
     @property
     def session_id(self) -> str | None:
@@ -324,9 +326,16 @@ Operations:
 
     def _run_bd(self, args: list[str], json_output: bool = True) -> tuple[bool, str]:
         """Run a bd command and return (success, output)."""
+        import os
+
         cmd = ["bd"] + args
         if json_output:
             cmd.append("--json")
+
+        # Build environment with optional BEADS_DIR for centralized tracking
+        env = os.environ.copy()
+        if self._beads_dir:
+            env["BEADS_DIR"] = os.path.expanduser(self._beads_dir)
 
         try:
             result = subprocess.run(
@@ -334,6 +343,7 @@ Operations:
                 capture_output=True,
                 text=True,
                 timeout=30,
+                env=env,
             )
             if result.returncode == 0:
                 return True, result.stdout.strip()
@@ -623,12 +633,15 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     # Mount hooks
     hooks_config = config.get("hooks", {})
 
+    # Get beads_dir from top-level config to pass to hooks
+    beads_dir = config.get("beads_dir")
+
     # Ready hook - injects ready tasks on first LLM request
     ready_config = hooks_config.get("ready", {})
     if ready_config.get("enabled", True):
         from amplifier_module_tool_beads.hooks import BeadsReadyHook
 
-        ready_hook = BeadsReadyHook(ready_config)
+        ready_hook = BeadsReadyHook(ready_config, beads_dir=beads_dir)
         coordinator.hooks.register(
             event="provider:request",
             handler=ready_hook.on_provider_request,
@@ -642,7 +655,7 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     if session_end_config.get("enabled", True):
         from amplifier_module_tool_beads.hooks import BeadsSessionEndHook
 
-        session_end_hook = BeadsSessionEndHook(session_end_config)
+        session_end_hook = BeadsSessionEndHook(session_end_config, beads_dir=beads_dir)
         coordinator.hooks.register(
             event="session:end",
             handler=session_end_hook.on_session_end,
