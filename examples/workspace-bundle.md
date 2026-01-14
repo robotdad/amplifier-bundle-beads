@@ -5,7 +5,7 @@ bundle:
   description: Workspace with beads task tracking
 
 includes:
-  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
+  # beads bundle already includes foundation, so we only need this
   - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main
 ---
 

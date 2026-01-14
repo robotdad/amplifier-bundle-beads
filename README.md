@@ -18,9 +18,20 @@ mkdir -p .amplifier
 curl -o .amplifier/bundle.md https://raw.githubusercontent.com/robotdad/amplifier-bundle-beads/main/examples/workspace-bundle.md
 ```
 
-**Step 2**: Start Amplifier in that directory.
+**Step 2**: Add and activate the bundle:
 
-**Step 3**: Start working. The agent handles the rest.
+```bash
+amplifier bundle add file://.amplifier/bundle.md
+amplifier bundle use my-workspace
+```
+
+**Step 3**: Start Amplifier and work:
+
+```bash
+amplifier
+```
+
+The agent handles the rest.
 
 ### What Happens on First Run
 
