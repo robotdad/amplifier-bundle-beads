@@ -195,10 +195,16 @@ Operations:
         return shutil.which("bd") is not None
 
     def _beads_initialized(self) -> bool:
-        """Check if beads is initialized in current directory."""
+        """Check if beads is initialized (either in configured beads_dir or current directory)."""
         import os
 
-        return os.path.isdir(".beads")
+        if self._beads_dir:
+            # Check configured centralized directory
+            beads_path = os.path.expanduser(self._beads_dir)
+            return os.path.isdir(beads_path)
+        else:
+            # Check current directory
+            return os.path.isdir(".beads")
 
     async def _op_setup(self, params: dict[str, Any]) -> ToolResult:
         """Install bd CLI and/or initialize beads in current directory.
