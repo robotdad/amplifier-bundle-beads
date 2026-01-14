@@ -31,7 +31,6 @@ dev = [
 
 [project.entry-points."amplifier.modules"]
 tool-beads = "amplifier_module_tool_beads.tool:mount"
-hook-beads = "amplifier_module_tool_beads.hooks:mount"
 
 [build-system]
 requires = ["hatchling"]

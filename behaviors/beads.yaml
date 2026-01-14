@@ -8,12 +8,13 @@
 tools:
   - module: tool-beads
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-
-hooks:
-  - module: hook-beads
-    source: git+https://github.com/robotdad/amplifier-bundle-beads@main
     config:
-      inject_ready: true
+      hooks:
+        ready:
+          enabled: true
+          max_issues: 10
+        session_end:
+          enabled: true
 
 context:
   include:
