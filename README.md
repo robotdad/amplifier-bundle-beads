@@ -18,20 +18,20 @@ mkdir -p .amplifier
 curl -o .amplifier/bundle.md https://raw.githubusercontent.com/robotdad/amplifier-bundle-beads/main/examples/workspace-bundle.md
 ```
 
-**Step 2**: Add and activate the bundle:
+**Step 2**: Register and activate the bundle:
 
 ```bash
-amplifier bundle add file://.amplifier/bundle.md
-amplifier bundle use my-workspace
+amplifier bundle add ./.amplifier/bundle.md
+amplifier bundle use my-workspace --project
 ```
 
-**Step 3**: Start Amplifier and work:
+**Step 3**: Start Amplifier:
 
 ```bash
 amplifier
 ```
 
-The agent handles the rest.
+The `--project` flag saves the setting, so future sessions in this directory automatically use the bundle.
 
 ### What Happens on First Run
 
