@@ -6,9 +6,6 @@ bundle:
     Beads integration for Amplifier - persistent, dependency-aware task tracking
     with session linking for follow-up questions across conversations.
 
-includes:
-  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-
 tools:
   - module: tool-beads
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
