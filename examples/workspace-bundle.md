@@ -27,7 +27,6 @@ To use a different beads directory, override the hooks config:
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-    entry_point: amplifier_module_tool_beads:mount
     config:
       beads_dir: ~/my-beads/.beads  # Your private beads location
 ```

@@ -67,14 +67,17 @@ By default, this bundle uses `~/Work/.beads` as a shared database across all you
 
 ### Alternative: Per-Project Tracking
 
-To store issues with each project (in `.beads/`), edit your bundle to remove the `beads_dir` config:
+To store issues with each project (in `.beads/`), create your own bundle that includes beads but overrides the config:
 
 ```yaml
+includes:
+  - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main
+
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
     config:
-      # beads_dir: ~/Work/.beads  # Comment out for per-project
+      # No beads_dir = per-project .beads/ directories
       hooks:
         ready:
           enabled: true
@@ -102,9 +105,10 @@ hooks:
 
 ## Including in Your Own Bundle
 
+The beads bundle already includes foundation, so you only need:
+
 ```yaml
 includes:
-  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
   - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main
 ```
 
