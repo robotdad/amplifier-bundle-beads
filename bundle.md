@@ -6,9 +6,6 @@ bundle:
     Beads integration for Amplifier - persistent, dependency-aware task tracking
     using the bd CLI. Agents use bd directly via bash.
 
-includes:
-  - bundle: foundation
-
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
