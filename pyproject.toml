@@ -1,7 +1,7 @@
 [project]
-name = "amplifier-module-tool-beads"
-version = "0.1.0"
-description = "Beads integration for Amplifier - persistent, dependency-aware task tracking with session linking"
+name = "amplifier-beads-hooks"
+version = "0.2.0"
+description = "Beads hooks for Amplifier - ready work injection and workflow reminders"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
@@ -22,9 +22,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
-    "pytest-cov>=4.0",
     "ruff>=0.1.0",
     "pyright>=1.1.0",
 ]
@@ -72,6 +69,4 @@ typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+
