@@ -9,7 +9,6 @@ bundle:
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-    entry_point: amplifier_module_tool_beads:mount
     config:
       # Centralized beads directory - all projects share this database
       # Comment out to use per-project .beads/ directories instead

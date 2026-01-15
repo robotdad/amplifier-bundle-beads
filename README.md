@@ -73,7 +73,6 @@ To store issues with each project (in `.beads/`), edit your bundle to remove the
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-    entry_point: amplifier_module_tool_beads:mount
     config:
       # beads_dir: ~/Work/.beads  # Comment out for per-project
       hooks:
@@ -117,7 +116,6 @@ Override hook config in your bundle:
 hooks:
   - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
-    entry_point: amplifier_module_tool_beads:mount
     config:
       beads_dir: ~/my-custom-path/.beads
       hooks:
