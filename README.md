@@ -18,9 +18,10 @@ mkdir -p .amplifier
 curl -o .amplifier/bundle.md https://raw.githubusercontent.com/robotdad/amplifier-bundle-beads/main/examples/workspace-bundle.md
 ```
 
-**Step 2**: Register and activate the bundle:
+**Step 2**: Register the beads bundle, then your workspace bundle:
 
 ```bash
+amplifier bundle add git+https://github.com/robotdad/amplifier-bundle-beads@main
 amplifier bundle add ./.amplifier/bundle.md
 amplifier bundle use my-workspace --project
 ```
