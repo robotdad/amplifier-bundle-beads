@@ -622,9 +622,12 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     Args:
         coordinator: Module coordinator
         config: Tool configuration with options:
+            - beads_dir: Path to centralized beads directory (default: current dir)
             - hooks.ready.enabled: Inject ready tasks on session start (default: True)
             - hooks.ready.max_issues: Max issues to show (default: 10)
             - hooks.session_end.enabled: Update issues on session end (default: True)
+            - hooks.workflow_reminder.enabled: Periodic workflow nudges (default: True)
+            - hooks.workflow_reminder.reminder_interval: Tool calls between reminders (default: 8)
     """
     import logging
 
@@ -669,5 +672,27 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
             name="beads-session-end",
         )
         logger.info("Registered beads-session-end hook on session:end")
+
+    # Workflow reminder hook - periodic nudges about discovered work and closing issues
+    workflow_config = hooks_config.get("workflow_reminder", {})
+    if workflow_config.get("enabled", True):
+        from amplifier_module_tool_beads.hooks import BeadsWorkflowReminderHook
+
+        workflow_hook = BeadsWorkflowReminderHook(workflow_config, beads_dir=beads_dir)
+        # Register on tool:post to track tool usage
+        coordinator.hooks.register(
+            event="tool:post",
+            handler=workflow_hook.on_tool_post,
+            priority=workflow_hook.priority,
+            name="beads-workflow-tracker",
+        )
+        # Register on provider:request to inject reminders
+        coordinator.hooks.register(
+            event="provider:request",
+            handler=workflow_hook.on_provider_request,
+            priority=workflow_hook.priority,
+            name="beads-workflow-reminder",
+        )
+        logger.info("Registered beads-workflow-reminder hooks")
 
     return tool
