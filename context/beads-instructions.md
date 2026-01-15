@@ -1,6 +1,35 @@
 # Beads Task Tracking
 
-You have access to **beads**, a persistent, dependency-aware task tracker that survives across sessions.
+You have access to **beads** (`bd` CLI), a persistent, dependency-aware task tracker that survives across sessions. Use it via bash.
+
+## Setup
+
+Check if bd is installed:
+
+```bash
+which bd
+```
+
+If not found, install it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+```
+
+Initialize beads (once per workspace or centralized location):
+
+```bash
+bd init
+```
+
+For centralized tracking across projects, set `BEADS_DIR` in your environment:
+
+```bash
+export BEADS_DIR=~/Work/.beads
+bd init  # Run once in that directory
+```
+
+When `BEADS_DIR` is set, all `bd` commands use that database regardless of current directory.
 
 ## When to Use Beads
 
@@ -16,99 +45,75 @@ Do NOT use beads for:
 - Temporary scratch work
 - Tasks that will be completed in this conversation
 
-## Tracking Modes
+## Essential Commands
 
-### Centralized Tracking (Configured via `beads_dir`)
+| Command | Purpose |
+|---------|---------|
+| `bd ready` | List tasks with no open blockers (what can be done now) |
+| `bd create "Title" -p 1` | Create a new task (priority 0-3) |
+| `bd show <id>` | View task details and audit trail |
+| `bd close <id> --reason "Done"` | Close a completed task |
+| `bd list` | List all tasks |
+| `bd list --status in_progress` | Filter by status |
 
-When `beads_dir` is configured, all projects share a single database:
-- Issues are tracked in one place regardless of which project you're working in
-- Cross-project dependencies work naturally
-- Can be backed by a private git repo (never pushed to public repos)
-- The agent handles all beads operations - users don't run `bd` commands
+Always use `--json` flag when you need to parse output programmatically:
 
-### Per-Project Tracking (Default)
-
-Without `beads_dir`, issues live in `.beads/` within each project:
-- Issues are committed with the project code
-- Visible in PRs and project history
-- Each project has its own issue namespace
+```bash
+bd ready --json
+bd show bd-a1b2 --json
+```
 
 ## Core Workflow
 
 ### 1. Check What's Ready
 
-At session start, you'll see ready work injected into context (if any exists).
-You can also explicitly check:
+At session start, check for available work:
 
-```
-beads(operation='ready')
+```bash
+bd ready --json
 ```
 
 This shows tasks with **no open blockers** - work that can be done now.
 
 ### 2. Claim Before Working
 
-Before starting on an issue, claim it:
+Before starting on an issue, mark it in progress:
 
+```bash
+bd update bd-a1b2 --status in_progress --json
 ```
-beads(operation='claim', issue_id='work-a1b2')
-```
-
-This marks it `in_progress` and tags it with your session ID.
 
 ### 3. Discover New Work
 
 If you find new work while working on something, file it with a link:
 
-```
-beads(operation='discover', title='Fix edge case in parser', parent_id='work-a1b2')
+```bash
+bd create "Fix edge case in parser" -p 2 --discovered-from bd-a1b2 --json
 ```
 
 This creates a `discovered-from` dependency, preserving context about how the work was found.
 
 ### 4. Close When Done
 
-```
-beads(operation='close', issue_id='work-a1b2', notes='Implemented caching with Redis')
+```bash
+bd close bd-a1b2 --reason "Implemented caching with Redis" --json
 ```
 
 ## Dependency Types
 
 Beads tracks four types of relationships:
 
-| Type | Meaning | Use When |
-|------|---------|----------|
-| `blocks` | A blocks B | B cannot start until A is done |
-| `blocked_by` | A is blocked by B | A cannot start until B is done |
-| `discovered-from` | A was found while working on B | Preserves discovery context |
-| `parent-child` | A is part of epic B | Hierarchical breakdown |
+| Type | Flag | Use When |
+|------|------|----------|
+| `blocks` | `--blocks bd-xyz` | This task blocks another |
+| `blocked-by` | `--blocked-by bd-xyz` | This task is blocked by another |
+| `discovered-from` | `--discovered-from bd-xyz` | Found while working on another task |
+| `parent-child` | `--parent bd-xyz` | Hierarchical breakdown (epics) |
 
-### Choosing Dependency Types
+### Adding Dependencies
 
-- **blocks/blocked_by**: Use for hard dependencies where work literally cannot proceed
-- **discovered-from**: Use when you find new work while doing other work (most common)
-- **parent-child**: Use for epics/stories breakdown, not for blocking relationships
-
-## Session Linking
-
-Every beads operation automatically tags issues with your session ID. This enables:
-
-1. **Finding related sessions**: `beads(operation='sessions', issue_id='work-a1b2')`
-2. **Reviving context**: `amplifier session resume <session_id>`
-3. **Answering follow-up questions**: Resume the session where work was done
-
-### Example: Follow-up Question
-
-```
-User: "What was the decision on work-a1b2?"
-
-1. beads(operation='sessions', issue_id='work-a1b2')
-   → Returns: linked_sessions: ['abc123', 'def456']
-
-2. Use task tool to spawn sub-session resuming abc123:
-   "Summarize what was decided and implemented for this issue"
-
-3. The resumed session has full context from when the work was done
+```bash
+bd dep add bd-a1b2 bd-c3d4 --type blocks --json
 ```
 
 ## Landing the Plane (MANDATORY)
@@ -118,22 +123,34 @@ Before ending ANY session where you worked on tracked issues, complete this chec
 ### Step 1: File ALL Discovered Work
 
 Review what you did. For each of these, file a discovered issue:
-- [ ] Follow-up tasks mentioned but not done
-- [ ] "We should also..." items
-- [ ] Edge cases deferred
-- [ ] Integration/testing work identified
-- [ ] Documentation needs
-- [ ] Refactoring opportunities noted
+- Follow-up tasks mentioned but not done
+- "We should also..." items
+- Edge cases deferred
+- Integration/testing work identified
+- Documentation needs
+- Refactoring opportunities noted
 
 **If you identified work and didn't file it, the whole point of beads is lost.**
+
+```bash
+bd create "Integration testing needed" -p 2 --discovered-from bd-xyz --json
+```
 
 ### Step 2: Update or Close Issues
 
 For each issue you worked on:
-- [ ] **Complete?** → `close` with summary of what was done
-- [ ] **Incomplete?** → `update` with notes on current state and what remains
+- **Complete?** → `bd close <id> --reason "Summary of what was done"`
+- **Incomplete?** → `bd update <id> --notes "Current state and what remains"`
 
-### Step 3: Verify
+### Step 3: Sync (if using centralized tracking)
+
+```bash
+bd sync
+```
+
+This exports to JSONL and syncs with git if configured.
+
+### Step 4: Verify
 
 Ask yourself:
 - "If a different agent picks this up tomorrow, do they have everything they need?"
@@ -141,79 +158,37 @@ Ask yourself:
 
 If the answer to either is "no" → go back and fix it.
 
-## Privacy Considerations
-
-Beads has **repo-level** privacy, not issue-level:
-- If using centralized tracking with a private repo, all issues are private
-- If using per-project tracking, issues are as visible as the project
-- There is no "mark this issue as private" flag
-- If you sync/push, ALL issues in that database go
-
-When users have sensitive work:
-- Use centralized tracking with a private backing repo
-- Or keep a separate beads database for sensitive planning
-
-## Syncing (Centralized Mode)
-
-When using a centralized beads database backed by git:
-
-```bash
-# Manual sync (user runs this, not the agent)
-cd ~/path/to/beads-repo
-bd sync  # Exports to JSONL
-git add . && git commit -m "Work session updates" && git push
-```
-
-Or configure auto-sync:
-```bash
-bd config set sync.auto_commit true
-bd config set sync.auto_push true
-```
-
-The agent should remind users to sync periodically if using centralized tracking.
-
 ## Agent Behavior Guidelines
 
 ### CRITICAL: Filing Discovered Work
 
-**This is the primary value of beads.** When you identify work that should be done but won't be done in this session, you MUST file it as a discovered issue. Examples:
+**This is the primary value of beads.** When you identify work that should be done but won't be done in this session, you MUST file it as a discovered issue.
 
 | While Working On | You Notice | Action |
 |------------------|------------|--------|
-| Implementing feature | Edge case needs handling later | `discover` with parent link |
-| Building a bundle | Integration testing needed | `discover` with parent link |
-| Fixing a bug | Related code needs refactoring | `discover` with parent link |
-| Any implementation | Follow-up work (docs, tests, polish) | `discover` with parent link |
+| Implementing feature | Edge case needs handling later | `bd create ... --discovered-from ...` |
+| Building a bundle | Integration testing needed | `bd create ... --discovered-from ...` |
+| Fixing a bug | Related code needs refactoring | `bd create ... --discovered-from ...` |
+| Any implementation | Follow-up work (docs, tests, polish) | `bd create ... --discovered-from ...` |
 
 **The pattern**: If you think "we should also..." or "later we'll need to..." → FILE IT NOW.
-
-```
-beads(operation='discover', title='Integration testing with amplifier CLI', parent_id='work-xyz', 
-      notes='Bundle built but not wired into CLI yet')
-```
-
-Discovered issues create a trail. Without them, follow-up work gets lost between sessions.
 
 ### CRITICAL: Closing Issues
 
 An issue with notes saying "implementation complete" is NOT closed. You must explicitly close it:
 
+```bash
+bd close bd-xyz --reason "Summary of what was done" --json
 ```
-beads(operation='close', issue_id='work-xyz', notes='Summary of what was done')
-```
-
-**Before ending a session**, if you worked on a tracked issue:
-1. Is the work actually complete? → Close it
-2. Is there follow-up work? → File discovered issues first, then close
-3. Is work incomplete? → Update notes with current state, leave open
 
 ### Do Automatically
-- Check `ready` work at session start (hooks handle this)
+- Check `bd ready` at session start
 - Create issues when multi-session work is identified
-- Claim issues before starting work on them
+- Mark issues `in_progress` before starting work
 - **File discovered work immediately when identified** (don't wait until session end)
 - **Close issues when their specific scope is complete**
-- Add notes before session ends if work is incomplete
+- Update notes before session ends if work is incomplete
+- Run `bd sync` at end of session
 
 ### Ask User First
 - Before creating issues for work the user described (confirm scope)
@@ -226,45 +201,40 @@ beads(operation='close', issue_id='work-xyz', notes='Summary of what was done')
 - **Update notes with "complete" without actually closing the issue**
 - **End a session with identified follow-up work without filing it**
 
-## Project AGENTS.md Content
-
-When using beads in a project, the project's AGENTS.md should include beads-specific context. This bundle provides generic beads guidance; project AGENTS.md provides the specifics.
-
-**Recommended AGENTS.md sections for beads projects:**
-
-```markdown
-## Beads Configuration
-
-- **Tracking mode**: Centralized at `~/Work/.beads` (shared across projects)
-- **Key issues**: bd-xxx (feature work), bd-yyy (tech debt)
-
-## Repository Structure
-
-| Directory | Purpose |
-|-----------|---------|
-| `repo-a/` | Core library |
-| `repo-b/` | CLI tool |
-
-## Project-Specific Completion Checklist
-
-Before ending a session:
-- [ ] Run tests: `cd repo-a && make test`
-- [ ] Push all repos
-- [ ] Sync beads: `bd sync && git push` (if centralized)
-```
-
-**Why this matters**: The bundle instructions tell agents *how* to use beads. The project AGENTS.md tells them *what* to track and *where* things are. Without project context, agents don't know which repos exist, which issues are relevant, or project-specific quality gates.
-
 ## Quick Reference
 
-| Operation | Required Params | Optional Params |
-|-----------|-----------------|-----------------|
-| `ready` | - | - |
-| `show` | `issue_id` | - |
-| `create` | `title` | `notes`, `blocks`, `blocked_by` |
-| `update` | `issue_id` | `title`, `status`, `notes`, `blocks`, `blocked_by` |
-| `close` | `issue_id` | `notes` |
-| `claim` | `issue_id` | - |
-| `discover` | `title`, `parent_id` | `notes` |
-| `list` | - | `filter_status` |
-| `sessions` | `issue_id` | - |
+```bash
+# See what's ready
+bd ready --json
+
+# Create new work
+bd create "Title" -p 1 --json
+bd create "Found while working" -p 2 --discovered-from bd-xyz --json
+
+# Work on something
+bd update bd-xyz --status in_progress --json
+
+# Complete work
+bd close bd-xyz --reason "Done" --json
+
+# Check status
+bd show bd-xyz --json
+bd list --json
+bd list --status in_progress --json
+
+# Sync at end of session
+bd sync
+```
+
+## Troubleshooting
+
+```bash
+# Check beads health
+bd doctor
+
+# See daemon status
+bd daemons list
+
+# Force sync
+bd sync --force
+```

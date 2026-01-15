@@ -1,32 +1,44 @@
 # amplifier-bundle-beads
 
-Persistent task tracking for Amplifier that survives across sessions.
+Persistent task tracking for Amplifier using the [beads](https://github.com/steveyegge/beads) `bd` CLI.
 
 ## What is Beads?
 
 [Beads](https://github.com/steveyegge/beads) is a task tracker designed for AI agents. It tracks:
 - What work is ready (no blockers)
 - Dependencies between tasks
-- Which sessions worked on what (so you can ask follow-up questions later)
+- Audit trails of changes
+
+This bundle integrates beads with Amplifier by:
+- Injecting ready work at session start (so agents know what's available)
+- Providing periodic workflow reminders (to file discovered work and close completed issues)
+- Including context that teaches agents how to use `bd` commands
+
+**Agents use `bd` directly via bash** - no wrapper tool needed.
 
 ## Getting Started
 
-**Step 1**: Create `.amplifier/bundle.md` in your workspace:
+**Step 1**: Register the beads bundle:
+
+```bash
+amplifier bundle add git+https://github.com/robotdad/amplifier-bundle-beads@main
+```
+
+**Step 2**: Create `.amplifier/bundle.md` in your workspace:
 
 ```bash
 mkdir -p .amplifier
 curl -o .amplifier/bundle.md https://raw.githubusercontent.com/robotdad/amplifier-bundle-beads/main/examples/workspace-bundle.md
 ```
 
-**Step 2**: Register the beads bundle, then your workspace bundle:
+**Step 3**: Register and use your workspace bundle:
 
 ```bash
-amplifier bundle add git+https://github.com/robotdad/amplifier-bundle-beads@main
 amplifier bundle add ./.amplifier/bundle.md
 amplifier bundle use my-workspace --project
 ```
 
-**Step 3**: Start Amplifier:
+**Step 4**: Start Amplifier:
 
 ```bash
 amplifier
@@ -38,58 +50,56 @@ The `--project` flag saves the setting, so future sessions in this directory aut
 
 When you first start a session with this bundle:
 
-1. If `bd` (the beads CLI) isn't installed, the agent will offer to install it
-2. If beads isn't initialized, the agent will set it up
-3. Once ready, the agent automatically:
-   - Shows you available work at session start
-   - Tracks multi-session tasks as you work
-   - Links sessions to issues for follow-up questions
+1. The agent sees ready work (if any exists) injected into context
+2. If `bd` isn't installed, the agent can install it via: `curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash`
+3. If beads isn't initialized, the agent runs `bd init`
 
-You don't need to learn beads commands - just work naturally and the agent handles the tracking.
+The agent uses `bd` commands directly via bash - the bundle provides context explaining how.
 
 ## Configuration
 
 ### Default: Centralized Tracking
 
-By default, this bundle uses `~/Work/.beads` as a shared database across all your projects. This means:
+By default, this bundle uses `~/Work/.beads` as a shared database across all your projects:
 - All your work tracked in one place
-- No per-project setup needed
-- Works across multiple workspaces
+- Cross-project dependencies work naturally
+- Set `BEADS_DIR` environment variable to use a different location
 
 ### Alternative: Per-Project Tracking
 
-If you prefer issues stored with each project (in `.beads/`), edit your bundle to remove the `beads_dir` config. The agent will then initialize beads in each project as needed.
+To store issues with each project (in `.beads/`), edit your bundle to remove the `beads_dir` config:
 
-### Private Tracking
-
-The default `~/Work/.beads` location can be backed by a private git repo if you want to sync/backup your task history. The agent can help set this up.
+```yaml
+hooks:
+  - module: beads-hooks
+    source: git+https://github.com/robotdad/amplifier-bundle-beads@main
+    entry_point: amplifier_module_tool_beads:mount
+    config:
+      # beads_dir: ~/Work/.beads  # Comment out for per-project
+      hooks:
+        ready:
+          enabled: true
+```
 
 ## What the Agent Does
 
 | Situation | Agent Action |
 |-----------|--------------|
-| Session starts | Shows ready work (if any) |
-| You describe multi-session work | Creates issues to track it |
-| You start on something | Claims the issue |
-| You find related work | Files it linked to current work |
-| Work completes | Closes the issue |
-| You ask about old work | Finds linked sessions for context |
+| Session starts | Sees ready work injected into context |
+| Multi-session work identified | Creates issues with `bd create ...` |
+| Starting on something | Claims with `bd update <id> --status in_progress` |
+| Finds related work | Files with `bd create ... --discovered-from <parent>` |
+| Work completes | Closes with `bd close <id> --reason "..."` |
+| Session ends | Runs `bd sync` to persist changes |
 
-## Example Conversation
+## Hooks Provided
 
-```
-You: "I need to refactor the auth module, but it depends on finishing the config changes first"
-
-Agent: [Creates two issues, links them with a dependency]
-
-You: "Let's work on the config changes"
-
-Agent: [Claims that issue, works on it]
-
-You: "That's done, what's next?"
-
-Agent: [Closes config issue, shows auth refactor is now unblocked]
-```
+| Hook | Event | Purpose |
+|------|-------|---------|
+| `beads-ready` | `provider:request` | Injects ready work at session start |
+| `beads-workflow-reminder` | `provider:request` | Periodic nudges about discovered work |
+| `beads-workflow-tracker` | `tool:post` | Tracks bd usage to avoid over-reminding |
+| `beads-session-end` | `session:end` | Marks session end on active issues |
 
 ## Including in Your Own Bundle
 
@@ -101,20 +111,24 @@ includes:
 
 ## Advanced Configuration
 
-Override the tool config in your bundle for custom settings:
+Override hook config in your bundle:
 
 ```yaml
-tools:
-  - module: tool-beads
+hooks:
+  - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
+    entry_point: amplifier_module_tool_beads:mount
     config:
-      beads_dir: ~/my-custom-path/.beads  # Custom location
+      beads_dir: ~/my-custom-path/.beads
       hooks:
         ready:
-          enabled: true       # Show ready work on session start
-          max_issues: 10      # Max issues to display
+          enabled: true
+          max_issues: 10
         session_end:
-          enabled: true       # Update issues when session ends
+          enabled: true
+        workflow_reminder:
+          enabled: true
+          reminder_interval: 8  # Tool calls between reminders
 ```
 
 ## Learn More

@@ -5,7 +5,6 @@ bundle:
   description: Workspace with beads task tracking
 
 includes:
-  # beads bundle already includes foundation, so we only need this
   - bundle: git+https://github.com/robotdad/amplifier-bundle-beads@main
 ---
 
@@ -16,22 +15,22 @@ Workspace with persistent task tracking via beads.
 ## Getting Started
 
 The agent will:
-- Check for ready work at session start
-- Track multi-session tasks automatically
-- Link sessions to issues for follow-up questions
+- See ready work injected at session start
+- Use `bd` commands via bash to track tasks
+- File discovered work and close completed issues
 
 ## Customization
 
-To use a centralized beads database (recommended for multi-project work),
-override the tool config:
+To use a different beads directory, override the hooks config:
 
 ```yaml
-tools:
-  - module: tool-beads
+hooks:
+  - module: beads-hooks
     source: git+https://github.com/robotdad/amplifier-bundle-beads@main
+    entry_point: amplifier_module_tool_beads:mount
     config:
       beads_dir: ~/my-beads/.beads  # Your private beads location
 ```
 
 To use per-project tracking instead, remove the `beads_dir` config and
-run `bd init` in your project directory.
+the agent will run `bd init` in your project directory as needed.

@@ -164,7 +164,7 @@ class BeadsReadyHook:
             lines.append(f"- ... and {len(issues) - self.max_issues} more")
 
         lines.append("")
-        lines.append("Use `beads(operation='claim', issue_id='...')` to claim a task.")
+        lines.append("To claim a task: `bd update <id> --status in_progress --json`")
 
         content = "\n".join(lines)
 
@@ -305,11 +305,11 @@ class BeadsWorkflowReminderHook:
         )
 
     async def on_tool_post(self, event: str, data: dict[str, Any]) -> HookResult:
-        """Track tool calls to detect beads tool usage.
+        """Track tool calls to detect bd CLI usage via bash.
 
         Args:
             event: Event name ("tool:post")
-            data: Event data with "tool" field
+            data: Event data with "tool" and optionally "input" fields
 
         Returns:
             HookResult(action="continue")
@@ -319,10 +319,14 @@ class BeadsWorkflowReminderHook:
             self.recent_tools.append(tool_name)
             self._tool_calls_since_reminder += 1
 
-            # Track if beads was ever used
-            if tool_name == "beads":
-                self._beads_used_this_session = True
-                logger.debug("BeadsWorkflowReminderHook: beads tool used")
+            # Track if bd was used via bash
+            if tool_name == "bash":
+                tool_input = data.get("input", {})
+                command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+                if "bd " in command or command.startswith("bd"):
+                    self._beads_used_this_session = True
+                    self._tool_calls_since_reminder = 0  # Reset on bd usage
+                    logger.debug("BeadsWorkflowReminderHook: bd CLI used via bash")
 
         return HookResult(action="continue")
 
@@ -348,9 +352,9 @@ class BeadsWorkflowReminderHook:
         if self._tool_calls_since_reminder < self.reminder_interval:
             return HookResult(action="continue")
 
-        # Check if beads was used recently
-        beads_used_recently = "beads" in self.recent_tools
-        if beads_used_recently:
+        # Check if bd was used recently (tracked via bash commands)
+        # If _tool_calls_since_reminder was reset recently, bd was used
+        if self._tool_calls_since_reminder < 3:
             return HookResult(action="continue")
 
         # Only remind if beads is available and has active work
@@ -410,9 +414,9 @@ class BeadsWorkflowReminderHook:
         parts.append(
             "You have active beads work tracked. As you work, remember:\n"
             "- **Discovered work**: If you identify follow-up tasks, edge cases, "
-            "or future improvements, file them with `beads(operation='discover', ...)`\n"
-            "- **Completed work**: If work on a claimed issue is done, close it with "
-            "`beads(operation='close', issue_id='...', notes='...')`"
+            "or future improvements, file them with `bd create \"Title\" --discovered-from <parent-id> --json`\n"
+            "- **Completed work**: If work on an issue is done, close it with "
+            "`bd close <id> --reason \"Summary\" --json`"
         )
 
         # Show current in-progress issues
